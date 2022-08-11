@@ -1,0 +1,62 @@
+#!/bin/bash
+# go to the current working directory and run this script from there
+
+
+# run gemma
+
+./gemma.macosx -g 49CC5_genfile.csv -p pheno.csv -a 49CC5_snpfile.csv -o 49CC5_relatedness1.txt -gk 1 -maf 0
+mv output/49CC5_relatedness1.txt.cXX.txt 49CC5_relatedness1.txt
+./gemma.macosx -g 49CC5_genfile.csv -p pheno.csv -a 49CC5_snpfile.csv -k 49CC5_relatedness1.txt -o output1 -lmm 4 -n 1 -maf 0 
+
+# do p-thresholding genome scoring
+cd output/
+cat output1.assoc.txt| tr -s '[:blank:]' ',' > output1.assoc.csv
+cat output1.assoc.csv| grep -v 'chr' > output2.assoc.csv
+paste -d ',' output2.assoc.csv ../49CC5_genfile.csv > preGS1.csv
+awk -F ',' '{ print $2,$8,$14,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,$53,$54,$55,$56,$57,$58,$59,$60,$61,$62,$63,$64,$65,$66,$67}' OFS=',' <preGS1.csv > preGS2.csv
+
+mkdir p-threshold
+cp preGS2.csv p-threshold/
+cp ../CalGenomeScore.sh p-threshold/CalGenomeScore.sh
+cd p-threshold
+mv preGS2.csv p1.0.csv
+awk -F "," '$3 < 0.9' <p1.0.csv > p0.9.csv
+awk -F "," '$3 < 0.8' <p1.0.csv > p0.8.csv
+awk -F "," '$3 < 0.7' <p1.0.csv > p0.7.csv
+awk -F "," '$3 < 0.6' <p1.0.csv > p0.6.csv
+awk -F "," '$3 < 0.5' <p1.0.csv > p0.5.csv
+awk -F "," '$3 < 0.4' <p1.0.csv > p0.4.csv
+awk -F "," '$3 < 0.3' <p1.0.csv > p0.3.csv
+awk -F "," '$3 < 0.2' <p1.0.csv > p0.2.csv
+awk -F "," '$3 < 0.1' <p1.0.csv > p0.1.csv
+
+./CalGenomeScore.sh
+
+DoGS3(){
+for FILE in $(ls final_out_* | cut -d '_' -f3)
+do
+tr ',' '\n' < final_out_${FILE} > finalGS_${FILE}
+paste -d ',' ../../pheno.csv finalGS_${FILE} > correlation_${FILE}
+COUNTER=$((COUNTER+=1))
+echo $COUNTER
+done
+}
+DoGS3
+
+
+# do regression
+cp ../../Correlation.awk . # dot indicates copy into current directory
+DoRegression(){
+for FILE in $(ls correlation_* | cut -d '_' -f2)
+do
+awk -F "," -f Correlation.awk correlation_${FILE} > Regression_${FILE}
+cat Regression_* > p-threshold_reg.txt
+done 
+}
+DoRegression
+
+
+
+cp p-threshold_reg.txt ../../p-threshold_reg.txt
+
+
